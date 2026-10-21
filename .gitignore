@@ -17,6 +17,10 @@ __pycache__/
 backend/evidence/*
 !backend/evidence/.gitkeep
 
+# Large media and model weights
+*.pt
+*.mp4
+
 # Environment variables & secrets
 .env
 .env.*

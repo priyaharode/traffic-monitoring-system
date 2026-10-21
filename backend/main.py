@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 from PIL import Image
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,6 +22,18 @@ app = FastAPI(
     title="Intelligent Traffic Monitoring System",
     description="Traffic violation detection and monitoring backend",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "*"
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 EVIDENCE_DIR = Path(__file__).resolve().parent / "evidence"
@@ -154,6 +167,7 @@ def get_analytics(db: Session = Depends(get_db)):
         )
 
     return {
+        "total": total,
         "total_violations": total,
         "pending": pending,
         "approved": approved,
@@ -309,6 +323,7 @@ def verify_evidence_integrity(
     return {
         "violation_id": violation_id,
         "integrity": "intact" if intact else "mismatch",
+        "intact": intact,
         "verified": intact,
         "stored_hash": violation.evidence_hash,
         "current_hash": current_hash,

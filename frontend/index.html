@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RTO Traffic Intelligence | National Enforcement & Monitoring Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Luxe Minimalist Grayscale & Slate Palette */
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-subtle: #f1f5f9;
+      --surface-hover: #f8fafc;
+      --border: #e2e8f0;
+      --border-subtle: #edf2f7;
+      --border-strong: #cbd5e1;
+      --text: #0f172a;
+      --text-secondary: #334155;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      
+      /* Subtle Functional Accents */
+      --onyx: #0f172a;
+      --onyx-hover: #1e293b;
+      --emerald: #059669;
+      --emerald-bg: #ecfdf5;
+      --emerald-border: #a7f3d0;
+      --crimson: #dc2626;
+      --crimson-bg: #fef2f2;
+      --crimson-border: #fecaca;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --amber-border: #fde68a;
+
+      /* Refined Shadows */
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+      --shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+      --shadow-lg: 0 20px 40px -10px rgba(15, 23, 42, 0.1), 0 8px 16px -4px rgba(15, 23, 42, 0.04);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Government Authority Line */
+    .top-gov-bar {
+      background: #ffffff;
+      border-bottom: 1px solid var(--border);
+      padding: 7px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.6px;
+    }
+    .gov-seal-text {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .gov-seal-text span {
+      background: var(--border);
+      height: 12px;
+      width: 1px;
+    }
+    .time-badge {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Primary Navigation Header */
+    header {
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 48px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .brand-emblem {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: var(--onyx);
+      color: #ffffff;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+    }
+    .brand-title h1 {
+      font-size: 18px;
+      font-weight: 750;
+      letter-spacing: -0.3px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .brand-tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--surface-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .conn-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .radar-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      position: relative;
+    }
+    .radar-dot.active {
+      background: var(--emerald);
+    }
+    .radar-dot.active::after {
+      content: '';
+      position: absolute;
+      top: -3px; left: -3px; right: -3px; bottom: -3px;
+      border-radius: 50%;
+      border: 1.5px solid var(--emerald);
+      animation: pulse 2s infinite ease-out;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.8; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+
+    /* Buttons */
+    .btn {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 15px;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.15s ease-in-out;
+    }
+    .btn-onyx {
+      background: var(--onyx);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+    }
+    .btn-onyx:hover {
+      background: var(--onyx-hover);
+      transform: translateY(-1px);
+    }
+    .btn-white {
+      background: #ffffff;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+    .btn-white:hover {
+      background: var(--surface-subtle);
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+    .btn-emerald {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid var(--emerald-border);
+    }
+    .btn-emerald:hover {
+      background: #d1fae5;
+      border-color: #6ee7b7;
+    }
+    .btn-crimson {
+      background: var(--crimson-bg);
+      color: var(--crimson);
+      border: 1px solid var(--crimson-border);
+    }
+    .btn-crimson:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+    }
+    .btn-sm {
+      padding: 5px 10px;
+      font-size: 11px;
+      border-radius: 6px;
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1520px;
+      margin: 0 auto;
+      padding: 32px 48px 60px;
+    }
+
+    /* Hero Headline */
+    .hero-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 26px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .hero-title h2 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+    .hero-title p {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    /* KPI Metric Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px 22px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+    }
+    .kpi-card:hover {
+      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+    }
+    .kpi-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+    .kpi-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+      background: var(--surface-subtle);
+      color: var(--text-secondary);
+    }
+    .kpi-value {
+      font-size: 32px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -1px;
+      color: var(--text);
+    }
+    .kpi-subtext {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Layout Split */
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2.5fr) minmax(320px, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* Panels */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      background: #ffffff;
+    }
+    .panel-title h3 {
+      font-size: 15px;
+      font-weight: 750;
+      letter-spacing: -0.2px;
+      color: var(--text);
+    }
+    .panel-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    /* Filter Controls */
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-input-wrap {
+      position: relative;
+      min-width: 190px;
+    }
+    .search-input-wrap input {
+      width: 100%;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 10px 7px 30px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+      transition: all 0.15s;
+    }
+    .search-input-wrap input:focus {
+      border-color: var(--onyx);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.05);
+    }
+    .search-icon {
+      position: absolute;
+      left: 9px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+    .custom-select {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 11px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      outline: none;
+      cursor: pointer;
+    }
+    .custom-select:focus {
+      border-color: var(--onyx);
+    }
+
+    /* Data Table */
+    .table-container {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    thead th {
+      background: var(--surface-subtle);
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background 0.15s;
+    }
+    tbody tr:hover {
+      background: var(--surface-subtle);
+    }
+    tbody td {
+      padding: 15px 18px;
+      vertical-align: middle;
+      font-size: 13px;
+    }
+
+    /* Authentic Indian HSRP Registration Plate */
+    .hsrp-plate {
+      display: inline-flex;
+      align-items: center;
+      background: #ffffff;
+      border: 1.5px solid #0f172a;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: 0.5px;
+    }
+    .hsrp-strip {
+      background: #003399;
+      color: #fff;
+      padding: 2px 4px;
+      font-size: 8px;
+      font-weight: 900;
+      letter-spacing: 0px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1;
+    }
+    .hsrp-number {
+      padding: 2px 8px;
+      font-size: 12px;
+    }
+
+    /* Badges & Tags */
+    .type-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--surface-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+    .status-badge.pending {
+      background: var(--amber-bg);
+      color: var(--amber);
+      border: 1px solid var(--amber-border);
+    }
+    .status-badge.approved {
+      background: var(--emerald-bg);
+      color: var(--emerald);
+      border: 1px solid var(--emerald-border);
+    }
+    .status-badge.rejected {
+      background: var(--crimson-bg);
+      color: var(--crimson);
+      border: 1px solid var(--crimson-border);
+    }
+
+    .confidence-meter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .confidence-bar {
+      width: 44px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .confidence-fill {
+      height: 100%;
+      background: var(--text-secondary);
+      border-radius: 99px;
+    }
+
+    .camera-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--surface-subtle);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* Aside Widgets */
+    .side-widget {
+      padding: 20px 24px;
+    }
+    .dist-row {
+      margin-bottom: 14px;
+    }
+    .dist-row:last-child {
+      margin-bottom: 0;
+    }
+    .dist-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 5px;
+    }
+    .dist-name {
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .dist-count {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .dist-track {
+      height: 6px;
+      background: var(--surface-subtle);
+      border-radius: 99px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+    }
+    .dist-fill {
+      height: 100%;
+      background: var(--onyx);
+      border-radius: 99px;
+      transition: width 0.3s ease-out;
+    }
+
+    /* Verification Box */
+    .verify-box {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .verify-input-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .verify-input-group input {
+      flex: 1;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 11px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+    .verify-input-group input:focus {
+      border-color: var(--onyx);
+    }
+    .verify-result-badge {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      line-height: 1.5;
+      word-break: break-all;
+      display: none;
+    }
+
+    /* Forensic Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      opacity: 0;
+      transition: opacity 0.2s ease-out;
+    }
+    .modal-backdrop.open {
+      display: grid;
+      opacity: 1;
+    }
+    .modal-dialog {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 800px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      animation: modalSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes modalSlide {
+      from { transform: translateY(15px) scale(0.98); }
+      to { transform: translateY(0) scale(1); }
+    }
+    .modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+    }
+    .modal-header h4 {
+      font-size: 15px;
+      font-weight: 750;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body {
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      background: #ffffff;
+    }
+    .evidence-image-preview {
+      width: 100%;
+      height: 250px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+    .evidence-image-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .no-image-placeholder {
+      color: var(--text-muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 20px;
+    }
+    .forensic-details {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .forensic-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .forensic-field .flabel {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .forensic-field .fval {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .hash-display {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      border-radius: 6px;
+      word-break: break-all;
+      color: var(--text-secondary);
+    }
+    .modal-footer {
+      padding: 14px 24px;
+      background: var(--surface-subtle);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* Toast Notifications */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-lg);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastIn 0.25s ease-out;
+      min-width: 260px;
+    }
+    .toast.success { border-left: 3px solid var(--emerald); }
+    .toast.error { border-left: 3px solid var(--crimson); }
+    @keyframes toastIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      background: #ffffff;
+      padding: 20px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-layout { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .modal-body { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .top-gov-bar { display: none; }
+      header { padding: 14px 20px; }
+      main { padding: 20px; }
+      .kpi-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Authority Bar -->
+  <div class="top-gov-bar">
+    <div class="gov-seal-text">
+      <span></span>
+      MINISTRY OF ROAD TRANSPORT &amp; HIGHWAYS · RTO AUTOMATED ENFORCEMENT DIVISION
+    </div>
+    <div class="time-badge" id="liveClock">IST --:--:--</div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand-group">
+      <div class="brand-emblem">⌁</div>
+      <div class="brand-title">
+        <h1>RTO Traffic Intelligence <span class="brand-tag">PORTAL 1.0</span></h1>
+        <p>National Command &amp; Control Centre · Automated Violation &amp; Evidence Audit System</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="conn-pill">
+        <span class="radar-dot active" id="radarDot"></span>
+        <span id="connLabel">API CONNECTED</span>
+      </div>
+      <button class="btn btn-white" id="refreshBtn">↻ Sync Records</button>
+      <button class="btn btn-onyx" id="openDocsBtn">Swagger API Docs ↗</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main>
+    <div class="hero-banner">
+      <div class="hero-title">
+        <h2>Live Traffic Enforcement Console</h2>
+        <p>Review computer-vision detected infractions, inspect photographic evidence, and verify cryptographic chain-of-custody.</p>
+      </div>
+      <div>
+        <span class="type-badge" style="font-size:11px; font-weight:600;">
+          🔒 SHA-256 Tamper Protection Active
+        </span>
+      </div>
+    </div>
+
+    <!-- KPI Metric Cards -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-head">
+          <span class="kpi-label">Total Events</span>
+          <span class="kpi-badge">DATABASE</span>
+        </div>
+        <div class="kpi-value" id="totalMetric">—</div>
+        <div class="kpi-subtext">All registered incident events</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-head">
+          <span class="kpi-label">Pending Verification</span>
+          <span class="kpi-badge" style="background:var(--amber-bg); color:var(--amber);">ACTION REQUIRED</span>
+        </div>
+        <div class="kpi-value" id="pendingMetric">—</div>
+        <div class="kpi-subtext">Awaiting human review</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-head">
+          <span class="kpi-label">Challans Approved</span>
+          <span class="kpi-badge" style="background:var(--emerald-bg); color:var(--emerald);">FINALIZED</span>
+        </div>
+        <div class="kpi-value" id="approvedMetric">—</div>
+        <div class="kpi-subtext">Enforced citations</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-head">
+          <span class="kpi-label">Dismissed / Rejected</span>
+          <span class="kpi-badge" style="background:var(--crimson-bg); color:var(--crimson);">DISMISSED</span>
+        </div>
+        <div class="kpi-value" id="rejectedMetric">—</div>
+        <div class="kpi-subtext">Rejected by reviewer</div>
+      </div>
+    </section>
+
+    <!-- Dashboard Layout Split -->
+    <div class="dashboard-layout">
+      <!-- Left: Primary Records Table -->
+      <section class="panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <h3>Registered Violations</h3>
+            <p id="tableCountText">Syncing incident stream...</p>
+          </div>
+          <div class="filter-bar">
+            <div class="search-input-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="search" id="searchInput" placeholder="Search Plate, Camera, ID...">
+            </div>
+            <select class="custom-select" id="typeFilter">
+              <option value="">All Infractions</option>
+              <option value="no_helmet">No Helmet</option>
+              <option value="triple_riding">Triple Riding</option>
+              <option value="red_light">Red Light Jumping</option>
+              <option value="stop_line">Stop Line Violation</option>
+            </select>
+            <select class="custom-select" id="statusFilter">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Vehicle Plate</th>
+                <th>Violation Type</th>
+                <th>Camera Node</th>
+                <th>Confidence</th>
+                <th>Timestamp (IST)</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody">
+              <tr>
+                <td colspan="7" style="text-align:center; padding: 40px; color: var(--text-dim);">Connecting to National Traffic Database...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Right: Infraction Breakdown & Cryptographic Audit -->
+      <aside>
+        <!-- Breakdown Chart -->
+        <section class="panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h3>Infraction Distribution</h3>
+              <p>Breakdown by violation category</p>
+            </div>
+          </div>
+          <div class="side-widget" id="distributionWidget">
+            <div style="color:var(--text-dim); text-align:center; padding: 20px;">Computing analytics...</div>
+          </div>
+        </section>
+
+        <!-- Cryptographic Audit Widget -->
+        <section class="panel" style="margin-top: 20px;">
+          <div class="panel-header">
+            <div class="panel-title">
+              <h3>SHA-256 Chain of Custody</h3>
+              <p>Cryptographic evidence verification</p>
+            </div>
+          </div>
+          <div class="side-widget">
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+              Verify that an uploaded evidentiary snapshot on disk has not been altered, tampered with, or corrupted.
+            </p>
+            <div class="verify-box">
+              <label style="font-size: 11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); font-weight:700;">Audit Violation Record ID</label>
+              <div class="verify-input-group">
+                <input type="number" id="quickAuditId" placeholder="e.g. 1" min="1">
+                <button class="btn btn-onyx btn-sm" id="quickAuditBtn">Audit Hash</button>
+              </div>
+              <div id="auditResultBox" class="verify-result-badge"></div>
+            </div>
+            <div style="margin-top: 14px; font-size: 11px; color: var(--text-dim); line-height: 1.4;">
+              ⚡ Recalculates file hash directly from disk bytes and tests against database integrity block.
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Evidence & Forensic Modal -->
+  <div class="modal-backdrop" id="evidenceModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h4><span>📁</span> Forensic Evidence Dossier · Record #<span id="modalRecordId">--</span></h4>
+        <button class="modal-close" id="modalCloseBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Photographic Image Capture -->
+        <div>
+          <div style="font-size: 11px; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:8px;">Photographic Capture Frame</div>
+          <div class="evidence-image-preview" id="modalImageContainer">
+            <img id="modalEvidenceImg" src="" alt="Evidence Image">
+            <div id="modalNoImgText" class="no-image-placeholder">No photographic evidence attached to this simulated record.</div>
+          </div>
+        </div>
+
+        <!-- Evidence Meta & SHA-256 Audit -->
+        <div class="forensic-details">
+          <div class="forensic-field">
+            <span class="flabel">Registration Plate</span>
+            <span class="fval" id="modalPlate">--</span>
+          </div>
+          <div class="forensic-field">
+            <span class="flabel">Violation Classification</span>
+            <span class="fval" id="modalType">--</span>
+          </div>
+          <div class="forensic-field">
+            <span class="flabel">Enforcement Camera</span>
+            <span class="fval" id="modalCamera">--</span>
+          </div>
+          <div class="forensic-field">
+            <span class="flabel">Cryptographic SHA-256 Signature</span>
+            <div class="hash-display" id="modalHashDisplay">Checking fingerprint...</div>
+          </div>
+          <div class="forensic-field">
+            <span class="flabel">Forensic Audit Status</span>
+            <div id="modalAuditStatus" style="font-weight:700; font-size:12px; margin-top:2px;">Auditing...</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-white btn-sm" id="modalDismissBtn">Dismiss Dialog</button>
+        <button class="btn btn-emerald btn-sm" id="modalApproveBtn">Approve E-Challan</button>
+        <button class="btn btn-crimson btn-sm" id="modalRejectBtn">Reject Citation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div>National Intelligent Transport Management System · Ministry of Road Transport &amp; Highways</div>
+    <div id="lastSyncTime">Last Data Sync: Initializing...</div>
+  </footer>
+
+  <script>
+    "use strict";
+
+    const API_BASE = "http://127.0.0.1:8000";
+    const SYNC_INTERVAL = 8000;
+
+    const violationNames = {
+      no_helmet: "No Helmet Riding",
+      triple_riding: "Triple Riding Pillion",
+      red_light: "Red Light Infraction",
+      stop_line: "Stop-Line Crossing"
+    };
+
+    let allRecords = [];
+    let currentSelectedRecord = null;
+
+    // Element Selectors
+    const $ = id => document.getElementById(id);
+
+    // Live Clock
+    function updateClock() {
+      const now = new Date();
+      $("liveClock").textContent = "IST " + now.toLocaleTimeString('en-IN', { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Toast Notifications
+    function notify(message, type="info") {
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span> <span>${message}</span>`;
+      $("toastContainer").appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        toast.style.transition = 'all 0.3s';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // API Helper
+    async function fetchAPI(path, options={}) {
+      const resp = await fetch(API_BASE + path, {
+        ...options,
+        headers: { "Accept": "application/json", ...(options.headers || {}) }
+      });
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        throw new Error(errorText || resp.statusText);
+      }
+      return await resp.json();
+    }
+
+    // Render Metrics
+    function renderKPIs(analytics) {
+      const total = analytics.total ?? analytics.total_violations ?? 0;
+      $("totalMetric").textContent = total;
+      $("pendingMetric").textContent = analytics.pending ?? 0;
+      $("approvedMetric").textContent = analytics.approved ?? 0;
+      $("rejectedMetric").textContent = analytics.rejected ?? 0;
+
+      // Render Distribution
+      const breakdown = analytics.by_type || {};
+      const keys = Object.keys(violationNames);
+      const counts = keys.map(k => breakdown[k] || 0);
+      const max = Math.max(1, ...counts);
+
+      $("distributionWidget").innerHTML = keys.map(k => {
+        const c = breakdown[k] || 0;
+        const pct = Math.max(0, (c / max) * 100);
+        return `
+          <div class="dist-row">
+            <div class="dist-info">
+              <span class="dist-name">${violationNames[k]}</span>
+              <span class="dist-count">${c}</span>
+            </div>
+            <div class="dist-track">
+              <div class="dist-fill" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Filter Logic
+    function getFilteredRecords() {
+      const query = $("searchInput").value.trim().toLowerCase();
+      const type = $("typeFilter").value;
+      const status = $("statusFilter").value;
+
+      return allRecords.filter(r => {
+        const text = `${r.vehicle_number || ''} ${r.camera_id || ''} ${r.id || ''}`.toLowerCase();
+        const matchQuery = !query || text.includes(query);
+        const matchType = !type || r.violation_type === type;
+        const matchStatus = !status || r.status === status;
+        return matchQuery && matchType && matchStatus;
+      });
+    }
+
+    // Render Records Table
+    function renderTable() {
+      const filtered = getFilteredRecords();
+      $("tableCountText").textContent = `Showing ${filtered.length} of ${allRecords.length} registered events`;
+
+      if (filtered.length === 0) {
+        $("recordsTbody").innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align:center; padding: 40px; color: var(--text-dim);">
+              No records match your search criteria.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      $("recordsTbody").innerHTML = filtered.map(r => {
+        const plate = r.vehicle_number || "MH--XX----";
+        const vType = r.violation_type || "no_helmet";
+        const vLabel = violationNames[vType] || vType;
+        const conf = r.confidence ? `${(r.confidence * 100).toFixed(1)}%` : "N/A";
+        const dateStr = r.timestamp ? new Date(r.timestamp).toLocaleString('en-IN') : "--";
+        const status = r.status || "pending";
+
+        const actionButtons = status === "pending" ? `
+          <button class="btn btn-emerald btn-sm" onclick="handleStatus(${r.id}, 'approved')">Approve</button>
+          <button class="btn btn-crimson btn-sm" onclick="handleStatus(${r.id}, 'rejected')">Reject</button>
+        ` : `
+          <span style="font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">Finalized</span>
+        `;
+
+        return `
+          <tr>
+            <td>
+              <div class="hsrp-plate">
+                <div class="hsrp-strip"><span>I</span><span>N</span><span>D</span></div>
+                <div class="hsrp-number">${plate}</div>
+              </div>
+              <div style="font-size:10px; color:var(--text-dim); margin-top:2px; font-family:'JetBrains Mono';">ID #${r.id}</div>
+            </td>
+            <td>
+              <span class="type-badge">
+                ● ${vLabel}
+              </span>
+            </td>
+            <td><span class="camera-tag">${r.camera_id || 'CAM_DEFAULT'}</span></td>
+            <td>
+              <div class="confidence-meter">
+                <div class="confidence-bar"><div class="confidence-fill" style="width: ${r.confidence ? r.confidence*100 : 80}%"></div></div>
+                <span style="font-family:'JetBrains Mono'; font-size:11px; color:var(--text-secondary);">${conf}</span>
+              </div>
+            </td>
+            <td style="color:var(--text-muted); font-size:12px;">${dateStr}</td>
+            <td>
+              <span class="status-badge ${status}">
+                ${status}
+              </span>
+            </td>
+            <td>
+              <div style="display:flex; gap:6px; align-items:center;">
+                ${actionButtons}
+                <button class="btn btn-white btn-sm" onclick="openEvidenceModal(${r.id})" title="Inspect Evidence & Forensic Hash">Dossier</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    // Refresh Core Data
+    async function syncData(silent = false) {
+      try {
+        const [health, analytics, list] = await Promise.all([
+          fetchAPI("/health"),
+          fetchAPI("/api/analytics"),
+          fetchAPI("/api/violations?limit=200")
+        ]);
+
+        allRecords = Array.isArray(list) ? list : [];
+        renderKPIs(analytics || {});
+        renderTable();
+
+        $("radarDot").className = "radar-dot active";
+        $("connLabel").textContent = "API CONNECTED";
+        $("lastSyncTime").textContent = "Last Data Sync: " + new Date().toLocaleTimeString('en-IN');
+      } catch (err) {
+        $("radarDot").className = "radar-dot";
+        $("connLabel").textContent = "API DISCONNECTED";
+        if (!silent) notify("Failed to sync with backend API. Ensure Uvicorn is running on port 8000.", "error");
+      }
+    }
+
+    // Update Status Action
+    window.handleStatus = async function(id, newStatus) {
+      try {
+        await fetchAPI(`/api/violations/${id}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus })
+        });
+        notify(`Violation #${id} marked as ${newStatus.toUpperCase()}`, "success");
+        await syncData(true);
+      } catch (err) {
+        notify(`Failed to update record: ${err.message}`, "error");
+      }
+    };
+
+    // Quick Audit Box on Right
+    $("quickAuditBtn").addEventListener("click", async () => {
+      const id = parseInt($("quickAuditId").value, 10);
+      const resBox = $("auditResultBox");
+      if (!id || id < 1) {
+        resBox.style.display = "block";
+        resBox.style.background = "var(--crimson-bg)";
+        resBox.style.color = "var(--crimson)";
+        resBox.textContent = "Please enter a valid violation ID.";
+        return;
+      }
+
+      resBox.style.display = "block";
+      resBox.style.background = "var(--surface-subtle)";
+      resBox.style.color = "var(--text-muted)";
+      resBox.textContent = "Calculating SHA-256 fingerprint from disk...";
+
+      try {
+        const res = await fetchAPI(`/api/violations/${id}/evidence-integrity`);
+        const intact = res.intact === true || res.verified === true || res.integrity === "intact";
+        resBox.style.background = intact ? "var(--emerald-bg)" : "var(--crimson-bg)";
+        resBox.style.color = intact ? "var(--emerald)" : "var(--crimson)";
+        resBox.innerHTML = `
+          <strong>${intact ? "✓ FORENSIC PASS: HASH INTACT" : "✕ AUDIT FAILURE: HASH MISMATCH"}</strong><br>
+          <span style="font-family:'JetBrains Mono'; font-size:10px;">${res.stored_hash || res.current_hash}</span>
+        `;
+      } catch (err) {
+        resBox.style.background = "var(--crimson-bg)";
+        resBox.style.color = "var(--crimson)";
+        resBox.textContent = "No evidentiary image uploaded for record #" + id + ".";
+      }
+    });
+
+    // Evidence Dossier Modal
+    window.openEvidenceModal = async function(id) {
+      const record = allRecords.find(r => r.id === id);
+      if (!record) return;
+      currentSelectedRecord = record;
+
+      $("modalRecordId").textContent = record.id;
+      $("modalPlate").textContent = record.vehicle_number || "Unregistered Plate";
+      $("modalType").textContent = violationNames[record.violation_type] || record.violation_type;
+      $("modalCamera").textContent = record.camera_id || "CAM_01";
+      $("modalHashDisplay").textContent = record.evidence_hash || "No Hash Generated (Evidence not uploaded)";
+
+      const imgElem = $("modalEvidenceImg");
+      const noImgElem = $("modalNoImgText");
+      const auditStatusElem = $("modalAuditStatus");
+
+      imgElem.style.display = "none";
+      noImgElem.style.display = "block";
+      noImgElem.textContent = "Retrieving photographic capture...";
+      auditStatusElem.textContent = "Verifying cryptographic chain of custody...";
+
+      // Open Modal
+      $("evidenceModal").classList.add("open");
+
+      // Load Image
+      const imgUrl = `${API_BASE}/api/violations/${id}/evidence`;
+      const testImg = new Image();
+      testImg.onload = () => {
+        imgElem.src = imgUrl;
+        imgElem.style.display = "block";
+        noImgElem.style.display = "none";
+      };
+      testImg.onerror = () => {
+        imgElem.style.display = "none";
+        noImgElem.style.display = "block";
+        noImgElem.textContent = "No photographic evidence uploaded for this simulated record.";
+      };
+      testImg.src = imgUrl;
+
+      // Verify Integrity
+      try {
+        const audit = await fetchAPI(`/api/violations/${id}/evidence-integrity`);
+        const intact = audit.intact === true || audit.verified === true || audit.integrity === "intact";
+        auditStatusElem.style.color = intact ? "var(--emerald)" : "var(--crimson)";
+        auditStatusElem.textContent = intact 
+          ? "✓ SHA-256 INTEGRITY VERIFIED (File matches upload signature)"
+          : "✕ TAMPER DETECTED (File on disk differs from signature)";
+        if (audit.stored_hash) {
+          $("modalHashDisplay").textContent = audit.stored_hash;
+        }
+      } catch (e) {
+        auditStatusElem.style.color = "var(--text-dim)";
+        auditStatusElem.textContent = "Evidence pending upload (No hash verified)";
+      }
+    };
+
+    $("modalCloseBtn").addEventListener("click", () => $("evidenceModal").classList.remove("open"));
+    $("modalDismissBtn").addEventListener("click", () => $("evidenceModal").classList.remove("open"));
+    $("modalApproveBtn").addEventListener("click", async () => {
+      if (currentSelectedRecord) {
+        await handleStatus(currentSelectedRecord.id, "approved");
+        $("evidenceModal").classList.remove("open");
+      }
+    });
+    $("modalRejectBtn").addEventListener("click", async () => {
+      if (currentSelectedRecord) {
+        await handleStatus(currentSelectedRecord.id, "rejected");
+        $("evidenceModal").classList.remove("open");
+      }
+    });
+
+    // Search and Filters
+    $("searchInput").addEventListener("input", renderTable);
+    $("typeFilter").addEventListener("change", renderTable);
+    $("statusFilter").addEventListener("change", renderTable);
+    $("refreshBtn").addEventListener("click", () => syncData());
+    $("openDocsBtn").addEventListener("click", () => window.open(API_BASE + "/docs", "_blank"));
+
+    // Initial Load & Auto-polling
+    syncData();
+    setInterval(() => syncData(true), SYNC_INTERVAL);
+  </script>
+</body>
+</html>
