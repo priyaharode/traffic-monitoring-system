@@ -1,0 +1,28 @@
+# Python virtual environment
+venv/
+env/
+ENV/
+*.venv
+
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite database
+*.db
+*.sqlite3
+
+# Local evidence files (keep directory via .gitkeep)
+backend/evidence/*
+!backend/evidence/.gitkeep
+
+# Environment variables & secrets
+.env
+.env.*
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
