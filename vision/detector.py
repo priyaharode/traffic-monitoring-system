@@ -253,6 +253,7 @@ class TrafficEnforcementDetector:
         self,
         video_path: Path = DEFAULT_VIDEO,
         output_path: Path = DEFAULT_OUTPUT,
+        max_frames: Optional[int] = None,
     ) -> None:
         """Process video stream with multi-model inference, tracking, and evidence dispatch."""
         if not video_path.exists():
@@ -301,6 +302,9 @@ class TrafficEnforcementDetector:
                     break
 
                 frame_idx += 1
+                if max_frames and frame_idx > max_frames:
+                    print(f"Reached max frame limit ({max_frames} frames). Finalizing video...")
+                    break
                 canvas = frame.copy()
 
                 # -------------------------------------------------------------
@@ -584,6 +588,7 @@ def parse_args():
     parser.add_argument("--line-x-max", type=int, default=420, help="Maximum X-coordinate for stop line")
     parser.add_argument("--custom-conf", type=float, default=0.40, help="Confidence threshold for custom model")
     parser.add_argument("--cooldown-frames", type=int, default=45, help="Frame cooldown for custom detections")
+    parser.add_argument("--max-frames", type=int, default=None, help="Maximum number of frames to process")
     parser.add_argument("--no-require-twowheeler", action="store_true", help="Disable two-wheeler proximity filter")
     parser.add_argument("--no-api", action="store_true", help="Disable API auto-reporting")
     return parser.parse_args()
@@ -606,6 +611,7 @@ def main():
     detector.process_video(
         video_path=Path(args.video),
         output_path=Path(args.output),
+        max_frames=args.max_frames,
     )
 
 

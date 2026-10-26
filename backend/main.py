@@ -464,4 +464,16 @@ def get_processed_video(filename: str):
     return FileResponse(file_path, media_type="video/mp4")
 
 
+# 11. Serve Frontend Dashboard
+FRONTEND_FILE = PROJECT_ROOT / "frontend" / "index.html"
+
+
+@app.get("/dashboard")
+def serve_dashboard():
+    """Serve the single-page RTO Traffic Intelligence dashboard."""
+    if not FRONTEND_FILE.is_file():
+        raise HTTPException(status_code=404, detail="Dashboard index.html not found")
+    return FileResponse(str(FRONTEND_FILE), media_type="text/html")
+
+
 
