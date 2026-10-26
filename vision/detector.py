@@ -145,6 +145,20 @@ class TrafficEnforcementDetector:
                     return True
         return False
 
+    @staticmethod
+    def _compute_iou(box1: np.ndarray, box2: np.ndarray) -> float:
+        """Compute Intersection over Union between two bounding boxes [x1, y1, x2, y2]."""
+        ix1 = max(box1[0], box2[0])
+        iy1 = max(box1[1], box2[1])
+        ix2 = min(box1[2], box2[2])
+        iy2 = min(box1[3], box2[3])
+        iw = max(0.0, ix2 - ix1)
+        ih = max(0.0, iy2 - iy1)
+        inter = iw * ih
+        area1 = max(0.0, (box1[2] - box1[0]) * (box1[3] - box1[1]))
+        area2 = max(0.0, (box2[2] - box2[0]) * (box2[3] - box2[1]))
+        return inter / float(area1 + area2 - inter + 1e-6)
+
     def _has_twowheeler_context(self, c_box: np.ndarray, twowheeler_boxes: list, plate_boxes: list, max_dist: float = 140.0) -> bool:
         """
         Check if a helmet or triple-riding detection is associated with a two-wheeler.
@@ -423,6 +437,13 @@ class TrafficEnforcementDetector:
                         if self.custom_names_by_id.get(cid, "").lower() == "plate"
                     ]
 
+                    # Extract WithHelmet boxes for conflict resolution against false WithoutHelmet alarms
+                    with_helmet_boxes = [
+                        (b, float(conf))
+                        for b, cid, conf in zip(c_boxes, c_cls_ids, c_confs)
+                        if self.custom_names_by_id.get(cid, "").lower() == "withhelmet"
+                    ]
+
                     for c_box, c_cls_id, c_conf in zip(c_boxes, c_cls_ids, c_confs):
                         c_name = self.custom_names_by_id.get(c_cls_id, f"class_{c_cls_id}")
                         cx1, cy1, cx2, cy2 = map(int, c_box)
@@ -447,6 +468,16 @@ class TrafficEnforcementDetector:
                         # C. Infractions: WithoutHelmet or TripleRiding
                         elif c_name in CUSTOM_VIOLATION_MAP:
                             mapped_violation = CUSTOM_VIOLATION_MAP[c_name]
+
+                            # Conflict Resolution: If this WithoutHelmet box overlaps with a WithHelmet detection,
+                            # suppress the false positive on compliant riders wearing helmets
+                            if mapped_violation == "no_helmet":
+                                is_wearing_helmet = any(
+                                    self._compute_iou(c_box, wb) > 0.35 and wc >= (raw_conf * 0.80)
+                                    for wb, wc in with_helmet_boxes
+                                )
+                                if is_wearing_helmet:
+                                    continue
 
                             # Contextual Guardrail: Verify proximity to a two-wheeler or plate
                             if not self._has_twowheeler_context(c_box, twowheeler_boxes, plate_boxes):
