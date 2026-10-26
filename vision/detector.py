@@ -586,7 +586,7 @@ def parse_args():
     parser.add_argument("--camera-id", type=str, default="CAM_01_NORTH", help="Camera identifier")
     parser.add_argument("--line-y", type=int, default=195, help="Y-coordinate for virtual stop line")
     parser.add_argument("--line-x-max", type=int, default=420, help="Maximum X-coordinate for stop line")
-    parser.add_argument("--custom-conf", type=float, default=0.40, help="Confidence threshold for custom model")
+    parser.add_argument("--custom-conf", type=float, default=0.25, help="Confidence threshold for custom model")
     parser.add_argument("--cooldown-frames", type=int, default=45, help="Frame cooldown for custom detections")
     parser.add_argument("--max-frames", type=int, default=None, help="Maximum number of frames to process")
     parser.add_argument("--no-require-twowheeler", action="store_true", help="Disable two-wheeler proximity filter")
