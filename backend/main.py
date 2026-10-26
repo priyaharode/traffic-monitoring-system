@@ -5,10 +5,11 @@ import uuid
 import io
 import re
 import hashlib
+import asyncio
 import subprocess
 from pathlib import Path
 from PIL import Image
-from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -346,7 +347,10 @@ def verify_evidence_integrity(
 
 # 9. Upload & Process Traffic Video
 @app.post("/api/video/process")
-async def process_traffic_video(file: UploadFile = File(...)):
+async def process_traffic_video(
+    file: UploadFile = File(...),
+    max_frames: Optional[int] = Form(default=300)
+):
     """
     Ingest a traffic video, validate constraints, run the multi-model vision pipeline,
     and generate tamper-evident violation records.
@@ -400,11 +404,19 @@ async def process_traffic_video(file: UploadFile = File(...)):
         "--camera-id", f"CAM_FEED_{video_hash[:6].upper()}",
         "--custom-conf", "0.40"
     ]
+    if max_frames and max_frames > 0:
+        cmd.extend(["--max-frames", str(max_frames)])
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        proc = await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=600
+        )
     except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="Video processing timed out after 300 seconds")
+        raise HTTPException(status_code=504, detail="Video processing timed out after 600 seconds")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to execute vision detector: {exc}")
 

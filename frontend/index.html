@@ -1084,6 +1084,18 @@
           </div>
         </div>
 
+        <!-- Processing Scope Selection -->
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--surface-subtle); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--border);">
+          <label for="processScopeSelect" style="font-size:12px; font-weight:600; color:var(--text-secondary);">
+            Processing Scope:
+          </label>
+          <select id="processScopeSelect" style="font-size:12px; font-family:inherit; padding:6px 10px; border-radius:6px; border:1px solid var(--border-strong); background:var(--surface); color:var(--text); cursor:pointer;">
+            <option value="300" selected>⚡ Rapid Review (300 frames · ~35s)</option>
+            <option value="600">🔍 Extended Analysis (600 frames · ~70s)</option>
+            <option value="0">🎥 Full Video (All frames)</option>
+          </select>
+        </div>
+
         <button class="btn btn-onyx" id="startProcessVideoBtn" style="width: 100%; padding: 12px; font-weight: 700;" disabled>
           ▶ Ingest &amp; Run Multi-Model Enforcement
         </button>
@@ -1495,10 +1507,13 @@
       processResults.style.display = "none";
       videoPlayer.style.display = "none";
       viewRecordsBtn.style.display = "none";
-      $("processStatusText").textContent = "Uploading video and running YOLO11 tracking & custom models...";
+      const scopeSelect = $("processScopeSelect");
+      const maxFramesVal = scopeSelect ? parseInt(scopeSelect.value) : 300;
+      $("processStatusText").textContent = `Processing stream (${maxFramesVal > 0 ? maxFramesVal + ' frames' : 'full stream'})...`;
 
       const formData = new FormData();
       formData.append("file", selectedVideoFile);
+      formData.append("max_frames", isNaN(maxFramesVal) ? 300 : maxFramesVal);
 
       try {
         const response = await fetch(`${API_BASE}/api/video/process`, {
