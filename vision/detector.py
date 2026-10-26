@@ -58,10 +58,11 @@ class TrafficEnforcementDetector:
         camera_id: str = "CAM_01_NORTH",
         stop_line_y: int = 195,
         stop_line_x_max: int = 420,
-        custom_conf_thresh: float = 0.20,
+        custom_conf_thresh: float = 0.40,
         enable_api: bool = True,
         cooldown_frames: int = 45,
         cooldown_dist_px: float = 80.0,
+        require_twowheeler: bool = True,
     ):
         self.api_base_url = api_base_url.rstrip("/")
         self.camera_id = camera_id
@@ -71,6 +72,7 @@ class TrafficEnforcementDetector:
         self.enable_api = enable_api
         self.cooldown_frames = cooldown_frames
         self.cooldown_dist_px = cooldown_dist_px
+        self.require_twowheeler = require_twowheeler
 
         # Validate weights exist
         if not tracking_model_path.exists():
@@ -141,6 +143,32 @@ class TrafficEnforcementDetector:
                 dist = math.hypot(cx - r["cx"], cy - r["cy"])
                 if dist < self.cooldown_dist_px:
                     return True
+        return False
+
+    def _has_twowheeler_context(self, c_box: np.ndarray, twowheeler_boxes: list, plate_boxes: list, max_dist: float = 140.0) -> bool:
+        """
+        Check if a helmet or triple-riding detection is associated with a two-wheeler.
+        Considers COCO motorcycles (class 3), bicycles (class 1), or custom Plate detections.
+        If no two-wheeler or plate exists in proximity, the detection is likely a pedestrian or background artifact.
+        """
+        if not self.require_twowheeler:
+            return True
+
+        cx = (c_box[0] + c_box[2]) / 2
+        cy = (c_box[1] + c_box[3]) / 2
+
+        for tb in twowheeler_boxes:
+            tx = (tb[0] + tb[2]) / 2
+            ty = (tb[1] + tb[3]) / 2
+            if math.hypot(cx - tx, cy - ty) < max_dist:
+                return True
+
+        for pb in plate_boxes:
+            px = (pb[0] + pb[2]) / 2
+            py = (pb[1] + pb[3]) / 2
+            if math.hypot(cx - px, cy - py) < max_dist:
+                return True
+
         return False
 
     def _report_violation(
@@ -286,6 +314,13 @@ class TrafficEnforcementDetector:
                 )[0]
 
                 active_tracks_in_frame = 0
+                twowheeler_boxes = []
+
+                if track_results.boxes is not None:
+                    raw_t_boxes = track_results.boxes.xyxy.cpu().numpy()
+                    raw_t_cls = track_results.boxes.cls.int().cpu().numpy()
+                    # Class 1: bicycle, Class 3: motorcycle in COCO
+                    twowheeler_boxes = [b for b, c in zip(raw_t_boxes, raw_t_cls) if c in (1, 3)]
 
                 if track_results.boxes is not None and track_results.boxes.id is not None:
                     boxes = track_results.boxes.xyxy.cpu().numpy()
@@ -378,6 +413,12 @@ class TrafficEnforcementDetector:
                     c_cls_ids = custom_results.boxes.cls.int().cpu().numpy()
                     c_confs = custom_results.boxes.conf.cpu().numpy()
 
+                    # Extract plate boxes in this frame for two-wheeler context association
+                    plate_boxes = [
+                        b for b, cid in zip(c_boxes, c_cls_ids)
+                        if self.custom_names_by_id.get(cid, "").lower() == "plate"
+                    ]
+
                     for c_box, c_cls_id, c_conf in zip(c_boxes, c_cls_ids, c_confs):
                         c_name = self.custom_names_by_id.get(c_cls_id, f"class_{c_cls_id}")
                         cx1, cy1, cx2, cy2 = map(int, c_box)
@@ -402,6 +443,11 @@ class TrafficEnforcementDetector:
                         # C. Infractions: WithoutHelmet or TripleRiding
                         elif c_name in CUSTOM_VIOLATION_MAP:
                             mapped_violation = CUSTOM_VIOLATION_MAP[c_name]
+
+                            # Contextual Guardrail: Verify proximity to a two-wheeler or plate
+                            if not self._has_twowheeler_context(c_box, twowheeler_boxes, plate_boxes):
+                                # Suppress false positive on isolated pedestrians/cyclists
+                                continue
 
                             # Determine visual style
                             if mapped_violation == "no_helmet":
@@ -536,8 +582,9 @@ def parse_args():
     parser.add_argument("--camera-id", type=str, default="CAM_01_NORTH", help="Camera identifier")
     parser.add_argument("--line-y", type=int, default=195, help="Y-coordinate for virtual stop line")
     parser.add_argument("--line-x-max", type=int, default=420, help="Maximum X-coordinate for stop line")
-    parser.add_argument("--custom-conf", type=float, default=0.20, help="Confidence threshold for custom model")
+    parser.add_argument("--custom-conf", type=float, default=0.40, help="Confidence threshold for custom model")
     parser.add_argument("--cooldown-frames", type=int, default=45, help="Frame cooldown for custom detections")
+    parser.add_argument("--no-require-twowheeler", action="store_true", help="Disable two-wheeler proximity filter")
     parser.add_argument("--no-api", action="store_true", help="Disable API auto-reporting")
     return parser.parse_args()
 
@@ -554,6 +601,7 @@ def main():
         custom_conf_thresh=args.custom_conf,
         enable_api=not args.no_api,
         cooldown_frames=args.cooldown_frames,
+        require_twowheeler=not args.no_require_twowheeler,
     )
     detector.process_video(
         video_path=Path(args.video),
