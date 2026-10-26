@@ -1053,6 +1053,28 @@
             <div id="modalAuditStatus" style="font-weight:700; font-size:12px; margin-top:2px;">Auditing...</div>
           </div>
         </div>
+
+        <!-- Officer Co-Violation Override (Add Uncaught Violation from Frame) -->
+        <div style="grid-column: 1 / -1; margin-top: 14px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface-subtle); border: 1px dashed var(--border-strong);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-size: 12px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px;">
+              <span>👮</span> Officer Manual Co-Violation Override
+            </span>
+            <span style="font-size: 11px; color: var(--text-muted);">Append undetected violation observed in this frame</span>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <select id="manualViolationTypeSelect" style="font-size: 12px; font-family: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); flex: 1; min-width: 170px;">
+              <option value="triple_riding">Triple Riding Pillion</option>
+              <option value="no_helmet">No Helmet Riding</option>
+              <option value="stop_line">Stop-Line Crossing</option>
+              <option value="red_light">Red Light Infraction</option>
+            </select>
+            <input type="text" id="manualVehicleNumberInput" placeholder="Vehicle No. (optional)" style="font-size: 12px; font-family: inherit; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); width: 150px;">
+            <button class="btn btn-onyx btn-sm" id="btnAppendManualViolation" style="white-space: nowrap; font-weight: 700;">
+              + Append Violation
+            </button>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn btn-white btn-sm" id="modalDismissBtn">Dismiss Dialog</button>
@@ -1440,6 +1462,40 @@
       if (currentSelectedRecord) {
         await handleStatus(currentSelectedRecord.id, "rejected");
         $("evidenceModal").classList.remove("open");
+      }
+    });
+
+    // Officer Co-Violation Override: Append Uncaught Violation from Frame
+    $("btnAppendManualViolation").addEventListener("click", async () => {
+      if (!currentSelectedRecord) return;
+      const vType = $("manualViolationTypeSelect").value;
+      const vPlate = ($("manualVehicleNumberInput").value || "").trim() || null;
+      const appendBtn = $("btnAppendManualViolation");
+
+      appendBtn.disabled = true;
+      appendBtn.textContent = "Appending...";
+
+      try {
+        const payload = {
+          violation_type: vType,
+          vehicle_number: vPlate,
+          status: "approved"
+        };
+        const res = await fetchAPI(`/api/violations/${currentSelectedRecord.id}/append-manual`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        notify(`Officer override: Appended ${violationNames[vType] || vType} (Record #${res.id})`, "success");
+        $("manualVehicleNumberInput").value = "";
+        $("evidenceModal").classList.remove("open");
+        syncData(true);
+      } catch (err) {
+        notify(`Failed to append violation: ${err.message}`, "error");
+      } finally {
+        appendBtn.disabled = false;
+        appendBtn.textContent = "+ Append Violation";
       }
     });
 

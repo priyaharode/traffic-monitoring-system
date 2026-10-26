@@ -18,7 +18,7 @@ from typing import Optional, Literal
 
 from database import Base, engine, get_db
 from models import Violation
-from schemas import ViolationCreate, ViolationResponse, ViolationStatusUpdate
+from schemas import ViolationCreate, ViolationResponse, ViolationStatusUpdate, ManualViolationAppend
 
 Base.metadata.create_all(bind=engine)
 
@@ -486,6 +486,42 @@ def serve_dashboard():
     if not FRONTEND_FILE.is_file():
         raise HTTPException(status_code=404, detail="Dashboard index.html not found")
     return FileResponse(str(FRONTEND_FILE), media_type="text/html")
+
+
+# 12. Officer Manual Violation Append from Existing Evidence Frame
+@app.post("/api/violations/{violation_id}/append-manual", response_model=ViolationResponse, status_code=201)
+def append_manual_violation(
+    violation_id: int,
+    data: ManualViolationAppend,
+    db: Session = Depends(get_db)
+):
+    """
+    Allow an enforcement officer to append an undetected violation from an existing evidence frame.
+    Inherits the exact photographic evidence frame and cryptographic hash.
+    """
+    original = db.query(Violation).filter(Violation.id == violation_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Parent violation record not found")
+
+    new_violation = Violation(
+        vehicle_number=data.vehicle_number or original.vehicle_number,
+        violation_type=data.violation_type,
+        camera_id=f"{original.camera_id} (OFFICER_OVERRIDE)" if original.camera_id else "OFFICER_OVERRIDE",
+        confidence=1.0,  # 100% Human-Verified
+        evidence_path=original.evidence_path,
+        evidence_hash=original.evidence_hash,
+        status=data.status
+    )
+
+    try:
+        db.add(new_violation)
+        db.commit()
+        db.refresh(new_violation)
+        return new_violation
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to append manual violation: {exc}")
+
 
 
 

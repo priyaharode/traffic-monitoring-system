@@ -30,6 +30,15 @@ class ViolationCreate(BaseModel):
     )
 
 
+class ManualViolationAppend(BaseModel):
+    violation_type: ViolationType
+    vehicle_number: Optional[str] = Field(
+        default=None, max_length=20
+    )
+    status: Literal["pending", "approved"] = "approved"
+
+
+
 class ViolationResponse(BaseModel):
     id: int
     vehicle_number: Optional[str]
