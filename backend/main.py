@@ -402,7 +402,7 @@ async def process_traffic_video(
         "--output", str(output_file_path),
         "--api-url", "http://127.0.0.1:8000",
         "--camera-id", f"CAM_FEED_{video_hash[:6].upper()}",
-        "--custom-conf", "0.25"
+        "--custom-conf", "0.22"
     ]
     if max_frames and max_frames > 0:
         cmd.extend(["--max-frames", str(max_frames)])
