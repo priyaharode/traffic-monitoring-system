@@ -16,6 +16,7 @@ Functionality:
 
 import argparse
 import math
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -23,6 +24,12 @@ import cv2
 import numpy as np
 import requests
 from ultralytics import YOLO
+
+try:
+    import easyocr
+    EASYOCR_AVAILABLE = True
+except ImportError:
+    EASYOCR_AVAILABLE = False
 
 # Project filesystem layout
 VISION_DIR = Path(__file__).resolve().parent
@@ -109,6 +116,15 @@ class TrafficEnforcementDetector:
         }
         self.api_failures: int = 0
 
+        # Optical Character Recognition (OCR) Engine for Plate Reading
+        self.ocr_reader = None
+        if EASYOCR_AVAILABLE:
+            try:
+                self.ocr_reader = easyocr.Reader(["en"], gpu=False, verbose=False)
+                print("[VISION] EasyOCR Engine loaded successfully for license plate recognition.")
+            except Exception as e:
+                print(f"[VISION] EasyOCR initialization notice: {e}")
+
         # Verify backend connectivity if API is enabled
         if self.enable_api:
             self._verify_backend_connection()
@@ -185,6 +201,30 @@ class TrafficEnforcementDetector:
 
         return False
 
+    def _read_plate_text(self, plate_crop: np.ndarray) -> Optional[str]:
+        """Extract and sanitize alphanumeric registration text from a localized plate crop."""
+        if self.ocr_reader is None or plate_crop is None or plate_crop.size == 0:
+            return None
+        h, w = plate_crop.shape[:2]
+        if h < 8 or w < 16:
+            return None
+        try:
+            # Preprocess: upscale if small, convert to grayscale
+            gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
+            if w < 100:
+                scale = 100.0 / w
+                gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_CUBIC)
+
+            results = self.ocr_reader.readtext(gray, detail=0)
+            if results:
+                raw_str = " ".join(results).upper()
+                clean_str = "".join(re.findall(r"[A-Z0-9]+", raw_str))
+                if len(clean_str) >= 4:
+                    return clean_str
+        except Exception:
+            pass
+        return None
+
     def _report_violation(
         self,
         violation_type: str,
@@ -192,10 +232,11 @@ class TrafficEnforcementDetector:
         crop_image: np.ndarray,
         frame_idx: int,
         details: str = "",
+        vehicle_number: Optional[str] = None,
     ) -> Optional[dict]:
         """
         Closed-loop auto-reporting:
-        1. POST /api/violations (Metadata with vehicle_number=None, actual confidence)
+        1. POST /api/violations (Metadata with vehicle_number from OCR, actual confidence)
         2. POST /api/violations/{id}/evidence (Evidence image upload & SHA-256 fingerprinting)
         """
         if not self.enable_api:
@@ -204,9 +245,9 @@ class TrafficEnforcementDetector:
         # Format raw model confidence without inflation
         reported_conf = round(float(confidence), 2)
 
-        # Stage 1: Ingest violation metadata (vehicle_number is None until OCR is integrated)
+        # Stage 1: Ingest violation metadata
         create_payload = {
-            "vehicle_number": None,
+            "vehicle_number": vehicle_number,
             "violation_type": violation_type,
             "camera_id": self.camera_id,
             "confidence": reported_conf,
@@ -248,6 +289,7 @@ class TrafficEnforcementDetector:
                 sha_hash = evidence_data.get("evidence_hash", "N/A")
                 short_hash = sha_hash[:16] if sha_hash else "None"
                 print(f"  [DISPATCH] Violation #{violation_id} logged | Type: {violation_type} | "
+                      f"Plate: {vehicle_number or 'Unread'} | "
                       f"Conf: {reported_conf*100:.0f}% | Details: {details} | SHA-256: {short_hash}...")
                 return {
                     "id": violation_id,
@@ -322,7 +364,40 @@ class TrafficEnforcementDetector:
                 canvas = frame.copy()
 
                 # -------------------------------------------------------------
-                # 1. TRACKING MODEL: Vehicle tracking & Stop-Line Enforcement
+                # 1. CUSTOM MODEL: Helmet, Triple-Riding, & License Plate Scan
+                # -------------------------------------------------------------
+                custom_results = self.custom_model(
+                    frame,
+                    conf=self.custom_conf_thresh,
+                    verbose=False,
+                )[0]
+
+                c_boxes = []
+                c_cls_ids = []
+                c_confs = []
+                plate_boxes = []
+                with_helmet_boxes = []
+
+                if custom_results.boxes is not None:
+                    c_boxes = custom_results.boxes.xyxy.cpu().numpy()
+                    c_cls_ids = custom_results.boxes.cls.int().cpu().numpy()
+                    c_confs = custom_results.boxes.conf.cpu().numpy()
+
+                    # Extract plate boxes in this frame for context association & OCR
+                    plate_boxes = [
+                        b for b, cid in zip(c_boxes, c_cls_ids)
+                        if self.custom_names_by_id.get(cid, "").lower() == "plate"
+                    ]
+
+                    # Extract WithHelmet boxes for conflict resolution against false WithoutHelmet alarms
+                    with_helmet_boxes = [
+                        (b, float(conf))
+                        for b, cid, conf in zip(c_boxes, c_cls_ids, c_confs)
+                        if self.custom_names_by_id.get(cid, "").lower() == "withhelmet"
+                    ]
+
+                # -------------------------------------------------------------
+                # 2. TRACKING MODEL: Vehicle tracking & Stop-Line Enforcement
                 # -------------------------------------------------------------
                 track_results = self.tracking_model.track(
                     frame,
@@ -379,9 +454,21 @@ class TrafficEnforcementDetector:
                             crop_x2 = min(width, x2 + 10)
                             vehicle_crop = frame[crop_y1:crop_y2, crop_x1:crop_x2]
 
+                            # OCR License Plate Reading for stop-line vehicle
+                            detected_plate_num = None
+                            for pb in plate_boxes:
+                                pcx = (pb[0] + pb[2]) / 2
+                                pcy = (pb[1] + pb[3]) / 2
+                                if (x1 - 25) <= pcx <= (x2 + 25) and (y1 - 25) <= pcy <= (y2 + 25):
+                                    px1, py1, px2, py2 = map(int, pb)
+                                    p_crop = frame[max(0, py1):min(height, py2), max(0, px1):min(width, px2)]
+                                    detected_plate_num = self._read_plate_text(p_crop)
+                                    if detected_plate_num:
+                                        break
+
                             raw_conf = round(float(conf), 2)
                             print(f"\n[!] STOP-LINE BREACH at Frame {frame_idx}:")
-                            print(f"    Target: Track #{track_id} ({v_name}) | Conf: {raw_conf*100:.0f}%")
+                            print(f"    Target: Track #{track_id} ({v_name}) | Plate: {detected_plate_num or 'Unread'} | Conf: {raw_conf*100:.0f}%")
                             print(f"    Trajectory: Centroid Y crossed {prev_y:.1f} -> {cy:.1f}")
 
                             api_result = self._report_violation(
@@ -390,6 +477,7 @@ class TrafficEnforcementDetector:
                                 crop_image=vehicle_crop,
                                 frame_idx=frame_idx,
                                 details=f"Track #{track_id} ({v_name})",
+                                vehicle_number=detected_plate_num,
                             )
 
                             self.violations_log.append({
@@ -418,32 +506,9 @@ class TrafficEnforcementDetector:
                         cv2.putText(canvas, label, (x1 + 2, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (255, 255, 255), 1, cv2.LINE_AA)
 
                 # -------------------------------------------------------------
-                # 2. CUSTOM MODEL: Helmet, Triple-Riding, & License Plate Scan
+                # 3. ENFORCE CUSTOM DETECTIONS: Helmet, Triple-Riding, Plates
                 # -------------------------------------------------------------
-                custom_results = self.custom_model(
-                    frame,
-                    conf=self.custom_conf_thresh,
-                    verbose=False,
-                )[0]
-
                 if custom_results.boxes is not None:
-                    c_boxes = custom_results.boxes.xyxy.cpu().numpy()
-                    c_cls_ids = custom_results.boxes.cls.int().cpu().numpy()
-                    c_confs = custom_results.boxes.conf.cpu().numpy()
-
-                    # Extract plate boxes in this frame for two-wheeler context association
-                    plate_boxes = [
-                        b for b, cid in zip(c_boxes, c_cls_ids)
-                        if self.custom_names_by_id.get(cid, "").lower() == "plate"
-                    ]
-
-                    # Extract WithHelmet boxes for conflict resolution against false WithoutHelmet alarms
-                    with_helmet_boxes = [
-                        (b, float(conf))
-                        for b, cid, conf in zip(c_boxes, c_cls_ids, c_confs)
-                        if self.custom_names_by_id.get(cid, "").lower() == "withhelmet"
-                    ]
-
                     for c_box, c_cls_id, c_conf in zip(c_boxes, c_cls_ids, c_confs):
                         c_name = self.custom_names_by_id.get(c_cls_id, f"class_{c_cls_id}")
                         cx1, cy1, cx2, cy2 = map(int, c_box)
@@ -455,8 +520,12 @@ class TrafficEnforcementDetector:
                         if c_name.lower() == "plate":
                             plate_color = (255, 200, 0)  # Cyan / Light Blue
                             cv2.rectangle(canvas, (cx1, cy1), (cx2, cy2), plate_color, 2)
-                            p_lbl = f"PLATE {raw_conf*100:.0f}%"
-                            cv2.putText(canvas, p_lbl, (cx1, max(12, cy1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.38, plate_color, 1, cv2.LINE_AA)
+                            p_crop = frame[max(0, cy1):min(height, cy2), max(0, cx1):min(width, cx2)]
+                            read_num = self._read_plate_text(p_crop)
+                            p_lbl = f"PLATE: {read_num}" if read_num else f"PLATE {raw_conf*100:.0f}%"
+                            (pw, ph), _ = cv2.getTextSize(p_lbl, cv2.FONT_HERSHEY_SIMPLEX, 0.40, 1)
+                            cv2.rectangle(canvas, (cx1, max(0, cy1 - 16)), (cx1 + pw + 4, cy1), plate_color, -1)
+                            cv2.putText(canvas, p_lbl, (cx1 + 2, max(11, cy1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.40, (0, 0, 0), 1, cv2.LINE_AA)
 
                         # B. WithHelmet (compliant, not a violation)
                         elif c_name.lower() == "withhelmet":
@@ -520,12 +589,26 @@ class TrafficEnforcementDetector:
                                 print(f"\n[!] {c_name.upper()} DETECTED at Frame {frame_idx}:")
                                 print(f"    Confidence: {raw_conf*100:.0f}% | Position: ({center_x:.0f}, {center_y:.0f})")
 
+                                # Extract closest localized plate in this frame via EasyOCR
+                                assigned_plate = None
+                                min_p_dist = 240.0
+                                for pb in plate_boxes:
+                                    pcx = (pb[0] + pb[2]) / 2
+                                    pcy = (pb[1] + pb[3]) / 2
+                                    d = math.hypot(center_x - pcx, center_y - pcy)
+                                    if d < min_p_dist:
+                                        min_p_dist = d
+                                        px1, py1, px2, py2 = map(int, pb)
+                                        p_crop = frame[max(0, py1):min(height, py2), max(0, px1):min(width, px2)]
+                                        assigned_plate = self._read_plate_text(p_crop)
+
                                 api_result = self._report_violation(
                                     violation_type=mapped_violation,
                                     confidence=raw_conf,
                                     crop_image=evidence_crop,
                                     frame_idx=frame_idx,
                                     details=f"{c_name} at ({center_x:.0f}, {center_y:.0f})",
+                                    vehicle_number=assigned_plate,
                                 )
 
                                 self.violations_log.append({
