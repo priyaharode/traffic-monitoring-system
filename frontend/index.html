@@ -616,6 +616,37 @@
       display: none;
     }
 
+    /* Video Upload & Dropzone Styling */
+    .dropzone-box {
+      border: 2px dashed var(--border-strong);
+      border-radius: var(--radius-md);
+      padding: 24px 20px;
+      text-align: center;
+      cursor: pointer;
+      background: var(--surface-subtle);
+      transition: all 0.2s ease;
+    }
+    .dropzone-box:hover {
+      border-color: var(--onyx);
+      background: #f8fafc;
+    }
+    .dropzone-box.has-file {
+      border-color: var(--emerald);
+      background: var(--emerald-bg);
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(15, 23, 42, 0.2);
+      border-radius: 50%;
+      border-top-color: var(--onyx);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* Forensic Modal */
     .modal-backdrop {
       position: fixed;
@@ -828,7 +859,8 @@
         <span id="connLabel">API CONNECTED</span>
       </div>
       <button class="btn btn-white" id="refreshBtn">↻ Sync Records</button>
-      <button class="btn btn-onyx" id="openDocsBtn">Swagger API Docs ↗</button>
+      <button class="btn btn-onyx" id="openUploadModalBtn" style="display:flex; align-items:center; gap:6px;"><span>📹</span> Ingest Traffic Video</button>
+      <button class="btn btn-white" id="openDocsBtn">Swagger API Docs ↗</button>
     </div>
   </header>
 
@@ -1026,6 +1058,54 @@
         <button class="btn btn-white btn-sm" id="modalDismissBtn">Dismiss Dialog</button>
         <button class="btn btn-emerald btn-sm" id="modalApproveBtn">Approve E-Challan</button>
         <button class="btn btn-crimson btn-sm" id="modalRejectBtn">Reject Citation</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Stream Ingestion & Processing Modal -->
+  <div class="modal-backdrop" id="videoUploadModal">
+    <div class="modal-dialog" style="max-width: 650px;">
+      <div class="modal-header">
+        <h4><span>📹</span> Traffic Surveillance Stream Ingestion</h4>
+        <button class="modal-close" id="videoModalCloseBtn">&times;</button>
+      </div>
+      <div class="modal-body" style="grid-template-columns: 1fr; gap: 16px;">
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">
+          Ingest a traffic surveillance video feed (MP4) to run YOLO11 vehicle tracking, virtual stop-line enforcement, and custom helmet/triple-riding detection with active two-wheeler guardrails.
+        </p>
+
+        <!-- Dropzone Box -->
+        <input type="file" id="videoFileInput" accept=".mp4,.avi,.mov,.mkv" style="display:none">
+        <div class="dropzone-box" id="videoDropzone">
+          <div style="font-size: 32px; margin-bottom: 8px;">🎬</div>
+          <div id="dropzoneLabel" style="font-size: 13px; color: var(--text-secondary);">
+            <strong>Click to select video stream</strong> or drag and drop MP4 here<br>
+            <span style="font-size: 11px; color: var(--text-muted);">Max file size: 100 MB · Formats: .mp4, .avi, .mov</span>
+          </div>
+        </div>
+
+        <button class="btn btn-onyx" id="startProcessVideoBtn" style="width: 100%; padding: 12px; font-weight: 700;" disabled>
+          ▶ Ingest &amp; Run Multi-Model Enforcement
+        </button>
+
+        <!-- Processing Status Box -->
+        <div id="videoProcessStatus" style="display: none; padding: 16px; border-radius: var(--radius-sm); background: var(--surface-subtle); border: 1px solid var(--border); text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; font-size: 13px; color: var(--text);">
+            <span class="spinner"></span>
+            <span id="processStatusText">Analyzing video stream...</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Running ByteTrack tracking &amp; custom YOLO models with SHA-256 evidence logging...</div>
+        </div>
+
+        <!-- Processing Results Box -->
+        <div id="videoProcessResults" style="display: none;">
+          <div id="resultsSummaryText" style="padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-subtle); margin-bottom: 12px;"></div>
+          <video id="processedVideoPlayer" controls playsinline style="width: 100%; max-height: 280px; background: #000; border-radius: 8px; border: 1px solid var(--border); display: none;"></video>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 14px 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <button class="btn btn-emerald btn-sm" id="viewNewRecordsBtn" style="display: none;">View Detected Infractions in Table</button>
+        <button class="btn btn-white btn-sm" id="videoModalDismissBtn">Close Dialog</button>
       </div>
     </div>
   </div>
@@ -1348,6 +1428,136 @@
         await handleStatus(currentSelectedRecord.id, "rejected");
         $("evidenceModal").classList.remove("open");
       }
+    });
+
+    // Video Stream Ingestion & Processing
+    const uploadModal = $("videoUploadModal");
+    const videoFileInput = $("videoFileInput");
+    const videoDropzone = $("videoDropzone");
+    const startProcessBtn = $("startProcessVideoBtn");
+    const processStatus = $("videoProcessStatus");
+    const processResults = $("videoProcessResults");
+    const videoPlayer = $("processedVideoPlayer");
+    const viewRecordsBtn = $("viewNewRecordsBtn");
+
+    let selectedVideoFile = null;
+
+    $("openUploadModalBtn").addEventListener("click", () => {
+      uploadModal.classList.add("open");
+    });
+    $("videoModalCloseBtn").addEventListener("click", () => uploadModal.classList.remove("open"));
+    $("videoModalDismissBtn").addEventListener("click", () => uploadModal.classList.remove("open"));
+
+    videoDropzone.addEventListener("click", () => videoFileInput.click());
+
+    videoDropzone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      videoDropzone.style.borderColor = "var(--onyx)";
+    });
+    videoDropzone.addEventListener("dragleave", () => {
+      videoDropzone.style.borderColor = "";
+    });
+    videoDropzone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (e.dataTransfer.files.length > 0) {
+        handleFileSelection(e.dataTransfer.files[0]);
+      }
+    });
+
+    videoFileInput.addEventListener("change", (e) => {
+      if (e.target.files.length > 0) {
+        handleFileSelection(e.target.files[0]);
+      }
+    });
+
+    function handleFileSelection(file) {
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!["mp4", "avi", "mov", "mkv"].includes(ext)) {
+        showToast("Please select a valid video format (.mp4, .avi, .mov)", "error");
+        return;
+      }
+      if (file.size > 100 * 1024 * 1024) {
+        showToast("Video exceeds 100 MB limit", "error");
+        return;
+      }
+
+      selectedVideoFile = file;
+      videoDropzone.classList.add("has-file");
+      $("dropzoneLabel").innerHTML = `<strong>Selected:</strong> ${file.name}<br><span style="font-size:11px; color:var(--emerald);">Size: ${(file.size / (1024*1024)).toFixed(2)} MB · Ready to Analyze</span>`;
+      startProcessBtn.disabled = false;
+    }
+
+    startProcessBtn.addEventListener("click", async () => {
+      if (!selectedVideoFile) return;
+
+      startProcessBtn.disabled = true;
+      processStatus.style.display = "block";
+      processResults.style.display = "none";
+      videoPlayer.style.display = "none";
+      viewRecordsBtn.style.display = "none";
+      $("processStatusText").textContent = "Uploading video and running YOLO11 tracking & custom models...";
+
+      const formData = new FormData();
+      formData.append("file", selectedVideoFile);
+
+      try {
+        const response = await fetch(`${API_BASE}/api/video/process`, {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server returned error ${response.status}`);
+        }
+
+        const data = await response.json();
+        processStatus.style.display = "none";
+        processResults.style.display = "block";
+
+        if (data.status === "already_processed") {
+          $("resultsSummaryText").innerHTML = `
+            <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">⚠️ Previously Processed</div>
+            <div style="font-size:12px; color:var(--text-muted);">${data.message}</div>
+          `;
+        } else {
+          const summary = data.summary || {};
+          $("resultsSummaryText").innerHTML = `
+            <div style="color:var(--emerald); font-weight:700; margin-bottom:6px;">✓ Video Stream Analyzed Successfully</div>
+            <div style="display:flex; gap:10px; font-size:12px; flex-wrap:wrap; margin-top:6px;">
+              <span class="type-badge">Stop-Line Breaches: <strong>${summary.stop_line || 0}</strong></span>
+              <span class="type-badge">No-Helmet Incidents: <strong>${summary.no_helmet || 0}</strong></span>
+              <span class="type-badge">Triple-Riding Cases: <strong>${summary.triple_riding || 0}</strong></span>
+              <span class="type-badge" style="background:var(--onyx); color:#fff;">Total Logged: <strong>${summary.total_logged || 0}</strong></span>
+            </div>
+          `;
+        }
+
+        if (data.annotated_video_url) {
+          videoPlayer.src = `${API_BASE}${data.annotated_video_url}`;
+          videoPlayer.style.display = "block";
+          videoPlayer.load();
+        }
+
+        viewRecordsBtn.style.display = "inline-block";
+        syncData(true);
+        showToast("Video processing completed successfully", "success");
+      } catch (err) {
+        processStatus.style.display = "none";
+        processResults.style.display = "block";
+        $("resultsSummaryText").innerHTML = `
+          <div style="color:var(--crimson); font-weight:700; margin-bottom:4px;">✕ Processing Failed</div>
+          <div style="font-size:12px; color:var(--crimson);">${err.message}</div>
+        `;
+        showToast(err.message, "error");
+      } finally {
+        startProcessBtn.disabled = false;
+      }
+    });
+
+    viewRecordsBtn.addEventListener("click", () => {
+      uploadModal.classList.remove("open");
+      syncData();
     });
 
     // Search and Filters

@@ -1,8 +1,11 @@
 
 import os
+import sys
 import uuid
 import io
+import re
 import hashlib
+import subprocess
 from pathlib import Path
 from PIL import Image
 from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
@@ -40,6 +43,17 @@ EVIDENCE_DIR = Path(__file__).resolve().parent / "evidence"
 EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+UPLOAD_DIR = PROJECT_ROOT / "dataset" / "uploads"
+PROCESSED_VIDEO_DIR = PROJECT_ROOT / "dataset" / "processed"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+MAX_VIDEO_SIZE = 100 * 1024 * 1024  # 100 MB
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv"}
+
+# In-memory deduplication registry to prevent duplicate records if a video upload is retried
+PROCESSED_VIDEO_HASHES: set[str] = set()
 
 
 @app.get("/")
@@ -328,5 +342,126 @@ def verify_evidence_integrity(
         "stored_hash": violation.evidence_hash,
         "current_hash": current_hash,
     }
+
+
+# 9. Upload & Process Traffic Video
+@app.post("/api/video/process")
+async def process_traffic_video(file: UploadFile = File(...)):
+    """
+    Ingest a traffic video, validate constraints, run the multi-model vision pipeline,
+    and generate tamper-evident violation records.
+    """
+    extension = Path(file.filename or "").suffix.lower()
+    if extension not in ALLOWED_VIDEO_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported video format '{extension}'. Allowed: {', '.join(sorted(ALLOWED_VIDEO_EXTENSIONS))}"
+        )
+
+    # Read video content with size limit enforcement (max 100 MB)
+    content = await file.read(MAX_VIDEO_SIZE + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty video file")
+    if len(content) > MAX_VIDEO_SIZE:
+        raise HTTPException(status_code=413, detail="Video exceeds 100 MB maximum size limit")
+
+    # Compute SHA-256 fingerprint of the uploaded video stream
+    video_hash = hashlib.sha256(content).hexdigest()
+    output_filename = f"annotated_{video_hash[:12]}.mp4"
+    output_file_path = PROCESSED_VIDEO_DIR / output_filename
+
+    # Deduplication guard: prevent duplicate records if job is retried
+    if video_hash in PROCESSED_VIDEO_HASHES and output_file_path.is_file():
+        return {
+            "status": "already_processed",
+            "message": "This video stream has already been processed. Duplicate record creation was prevented.",
+            "video_hash": video_hash,
+            "annotated_video_url": f"/api/video/processed/{output_filename}",
+            "filename": file.filename,
+            "events_logged": 0
+        }
+
+    # Save uploaded video safely to designated staging directory
+    input_filename = f"upload_{video_hash[:12]}{extension}"
+    input_file_path = UPLOAD_DIR / input_filename
+    input_file_path.write_bytes(content)
+
+    # Invoke vision/detector.py with explicit input/output paths
+    detector_script = PROJECT_ROOT / "vision" / "detector.py"
+    if not detector_script.is_file():
+        raise HTTPException(status_code=500, detail="Vision detector script not found on server")
+
+    cmd = [
+        sys.executable,
+        str(detector_script),
+        "--video", str(input_file_path),
+        "--output", str(output_file_path),
+        "--api-url", "http://127.0.0.1:8000",
+        "--camera-id", f"CAM_FEED_{video_hash[:6].upper()}",
+        "--custom-conf", "0.40"
+    ]
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Video processing timed out after 300 seconds")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to execute vision detector: {exc}")
+
+    if proc.returncode != 0:
+        err_msg = proc.stderr[-400:] if proc.stderr else proc.stdout[-400:]
+        raise HTTPException(status_code=500, detail=f"Vision pipeline error (Code {proc.returncode}): {err_msg}")
+
+    # Register hash to prevent duplicate reprocessing
+    PROCESSED_VIDEO_HASHES.add(video_hash)
+
+    # Parse stdout for incident summary
+    stdout_text = proc.stdout
+    stopline_count = 0
+    helmet_count = 0
+    triple_count = 0
+    total_events = 0
+
+    m_stop = re.search(r"Stop-Line Breaches:\s+(\d+)", stdout_text)
+    if m_stop:
+        stopline_count = int(m_stop.group(1))
+    m_helm = re.search(r"No-Helmet Incidents:\s+(\d+)", stdout_text)
+    if m_helm:
+        helmet_count = int(m_helm.group(1))
+    m_trip = re.search(r"Triple-Riding Cases:\s+(\d+)", stdout_text)
+    if m_trip:
+        triple_count = int(m_trip.group(1))
+    m_tot = re.search(r"Total Logged Events:\s+(\d+)", stdout_text)
+    if m_tot:
+        total_events = int(m_tot.group(1))
+
+    return {
+        "status": "success",
+        "message": "Video successfully analyzed and infractions registered.",
+        "video_hash": video_hash,
+        "input_filename": file.filename,
+        "output_filename": output_filename,
+        "annotated_video_url": f"/api/video/processed/{output_filename}",
+        "summary": {
+            "stop_line": stopline_count,
+            "no_helmet": helmet_count,
+            "triple_riding": triple_count,
+            "total_logged": total_events
+        }
+    }
+
+
+# 10. Stream / Retrieve Processed Video
+@app.get("/api/video/processed/{filename}")
+def get_processed_video(filename: str):
+    """Serve the annotated MP4 video generated by the vision pipeline."""
+    safe_name = Path(filename).name
+    file_path = (PROCESSED_VIDEO_DIR / safe_name).resolve()
+    if file_path.parent != PROCESSED_VIDEO_DIR.resolve():
+        raise HTTPException(status_code=400, detail="Invalid video path")
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Processed video file not found")
+    return FileResponse(file_path, media_type="video/mp4")
+
 
 

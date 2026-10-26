@@ -202,7 +202,7 @@ class TrafficEnforcementDetector:
             create_resp = requests.post(
                 f"{self.api_base_url}/api/violations",
                 json=create_payload,
-                timeout=5.0,
+                timeout=15.0,
             )
             if create_resp.status_code != 201:
                 self.api_failures += 1
@@ -226,7 +226,7 @@ class TrafficEnforcementDetector:
             upload_resp = requests.post(
                 f"{self.api_base_url}/api/violations/{violation_id}/evidence",
                 files=files,
-                timeout=5.0,
+                timeout=15.0,
             )
 
             if upload_resp.status_code == 200:
